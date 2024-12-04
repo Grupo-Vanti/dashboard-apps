@@ -27,7 +27,9 @@
   "dependencies": {
     "@commercelayer/app-elements": "3.5.0",
     "@commercelayer/eslint-config-ts-react": "^1.4.5",
+    "@commercelayer/js-auth": "^6.7.0",
     "@commercelayer/sdk": "6.25.1",
+    "dashboard-apps-common": "workspace:*",
     "@vitejs/plugin-react": "^4.3.4",
     "lodash": "^4.17.21",
     "papaparse": "^5.4.1",

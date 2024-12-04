@@ -81,7 +81,8 @@ const NewExportPage = (): JSX.Element | null => {
         dry_data: values.dryData,
         includes: values.includes,
         format: values.format,
-        filters
+        filters,
+        metadata: { email: user?.email ?? '' }
       })
       setLocation(appRoutes.list.makePath())
     } catch (error) {
@@ -110,8 +111,8 @@ const NewExportPage = (): JSX.Element | null => {
           resourceType={resourceType}
           isLoading={isLoading}
           defaultValues={{
-            dryData: false,
-            format: 'json',
+            dryData: true,
+            format: 'csv',
             includes: []
           }}
           onSubmit={(values) => {

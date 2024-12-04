@@ -1,3 +1,4 @@
+import { type TokenProviderAuthUser } from '@commercelayer/app-elements/dist/providers/TokenProvider/types'
 import { type InputSelectValue } from '@commercelayer/app-elements/dist/ui/forms/InputSelect'
 import type {
   CommerceLayerClient,
@@ -5,6 +6,7 @@ import type {
   Resource
 } from '@commercelayer/sdk'
 import { type AllowedParentResource, type AllowedResourceType } from 'App'
+import { getExcludedPriceList } from 'dashboard-apps-common/src/utils/getExcludedPriceList'
 
 /**
  * Retrieve a list of resources from api filtered by hint if provided.
@@ -16,20 +18,28 @@ import { type AllowedParentResource, type AllowedResourceType } from 'App'
 export const fetchResources = async ({
   sdkClient,
   resourceType,
+  user,
   hint
 }: {
   sdkClient: CommerceLayerClient
   resourceType: AllowedResourceType | AllowedParentResource
+  user: TokenProviderAuthUser | null
   hint?: string
 }): Promise<InputSelectValue[]> => {
+  const filters: Record<string, string> = {
+    id_not_in: getExcludedPriceList(
+      user,
+      import.meta.env.PUBLIC_TEST_USERS
+    ).join(',')
+  }
+
+  if (hint != null) {
+    filters.name_cont = hint
+  }
+
   // @ts-expect-error Expression produces a union type that is too complex to represent
   const fetchedResources = await sdkClient[resourceType].list({
-    filters:
-      hint != null
-        ? {
-            name_cont: hint
-          }
-        : undefined,
+    filters,
     pageSize: 25,
     // @ts-expect-error Expression produces a union type that is too complex to represent
     sort: {
