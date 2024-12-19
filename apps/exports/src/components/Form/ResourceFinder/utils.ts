@@ -1,3 +1,4 @@
+import { type TokenProviderAuthUser } from '@commercelayer/app-elements/dist/providers/TokenProvider/types'
 import { type InputSelectValue } from '@commercelayer/app-elements/dist/ui/forms/InputSelect'
 import type {
   CommerceLayerClient,
@@ -5,6 +6,8 @@ import type {
   QueryArrayFields,
   Resource
 } from '@commercelayer/sdk'
+import { getExcludedPriceList } from 'dashboard-apps-common/src/utils/getExcludedPriceList'
+import { getUserDomain } from 'dashboard-apps-common/src/utils/userUtils'
 
 export type SearchableResource =
   | 'markets'
@@ -64,16 +67,64 @@ export const fetchResourcesByHint = async ({
   })
 }
 
+const getShippingCategoryId = async (
+  sdkClient: CommerceLayerClient,
+  user: TokenProviderAuthUser | null
+): Promise<string> => {
+  const list = await sdkClient.shipping_categories.list({
+    sort: { created_at: 'desc' },
+    filters: {
+      metadata_jcont: {
+        domain: getUserDomain(user, import.meta.env.PUBLIC_TEST_USERS) ?? ''
+      }
+    }
+  })
+  return list?.[0]?.id ?? null
+}
+
 export const fetchInitialResources = async ({
   sdkClient,
   resourceType,
   fields = ['name', 'id'],
   fieldForValue,
-  fieldForLabel
-}: SearchParams<SearchableResource>): Promise<InputSelectValue[]> => {
+  fieldForLabel,
+  user
+}: SearchParams<SearchableResource> & {
+  user: TokenProviderAuthUser | null
+}): Promise<InputSelectValue[]> => {
+  const shippingCategoryId = await getShippingCategoryId(sdkClient, user)
+  let filters
+
+  if (shippingCategoryId !== null && shippingCategoryId !== undefined) {
+    if (resourceType === 'skus') {
+      filters = {
+        shipping_category_id_eq: shippingCategoryId
+      }
+    }
+
+    if (resourceType === 'price_lists') {
+      filters = {
+        id_not_in:
+          user != null
+            ? getExcludedPriceList(
+                user,
+                import.meta.env.PUBLIC_TEST_USERS
+              ).join(',')
+            : ''
+      }
+    }
+
+    if (resourceType === 'shipping_categories') {
+      filters = {
+        id_eq: shippingCategoryId
+      }
+    }
+  }
+
   const fetchedResources = await sdkClient[resourceType].list({
     fields,
-    pageSize: 25
+    pageSize: 25,
+    filters
   })
   return adaptApiToSuggestions({
     fetchedResources,

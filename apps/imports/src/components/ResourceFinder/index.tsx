@@ -1,16 +1,18 @@
-import { type CommerceLayerClient } from '@commercelayer/sdk'
-import { type AllowedParentResource, type AllowedResourceType } from 'App'
-import { useEffect, useRef, useState } from 'react'
-import { fetchResources } from './utils'
 import {
   InputSelect,
   Label,
-  isSingleValueSelected
+  isSingleValueSelected,
+  useTokenProvider
 } from '@commercelayer/app-elements'
 import {
-  type InputSelectValue,
-  type InputSelectProps
+  type InputSelectProps,
+  type InputSelectValue
 } from '@commercelayer/app-elements/dist/ui/forms/InputSelect'
+import { type CommerceLayerClient } from '@commercelayer/sdk'
+import { type AllowedParentResource, type AllowedResourceType } from 'App'
+import { getUserDomain } from 'dashboard-apps-common/src/utils/userUtils'
+import { useEffect, useRef, useState } from 'react'
+import { fetchResources } from './utils'
 
 interface Props extends Pick<InputSelectProps, 'feedback' | 'hint'> {
   /**
@@ -44,17 +46,28 @@ export function ResourceFinder({
   hint,
   onSelect
 }: Props): JSX.Element {
+  const { user } = useTokenProvider()
   const [isLoading, setIsLoading] = useState(true)
   const [initialValues, setInitialValues] = useState<InputSelectValue[]>([])
   const element = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (resourceType == null) {
+    if (
+      resourceType == null ||
+      getUserDomain(user, import.meta.env.PUBLIC_TEST_USERS) == null
+    ) {
       return
     }
     setIsLoading(true)
-    void fetchResources({ sdkClient, resourceType })
-      .then(setInitialValues)
+    void fetchResources({ sdkClient, resourceType, user })
+      .then((values) => {
+        /* if (!isAdmin(user, import.meta.env.PUBLIC_TEST_USERS)) {
+          values = values.filter((value: any) => {
+            return !getExcludedPriceList(user, import.meta.env.PUBLIC_TEST_USERS).includes(value.value)
+          })
+        }
+         */ setInitialValues(values)
+      })
       .finally(() => {
         setIsLoading(false)
       })
@@ -93,7 +106,7 @@ export function ResourceFinder({
           }
         }}
         loadAsyncValues={async (hint) => {
-          return await fetchResources({ sdkClient, resourceType, hint })
+          return await fetchResources({ sdkClient, resourceType, user, hint })
         }}
       />
     </div>

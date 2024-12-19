@@ -1,9 +1,9 @@
 import { ImportPreview } from '#components/ImportPreview'
-import { InputCode } from '#components/InputCode'
 import { InputParser } from '#components/InputParser'
 import { ResourceFinder } from '#components/ResourceFinder'
 import { getParentResourceIfNeeded, isAvailableResource } from '#data/resources'
 import { appRoutes } from '#data/routes'
+import { sleep } from '#utils/sleep'
 import { validateParentResource } from '#utils/validateParentResource'
 import {
   Button,
@@ -13,13 +13,20 @@ import {
   PageLayout,
   Spacer,
   Tab,
-  Tabs,
   formatResourceName,
   useCoreSdkProvider,
   useTokenProvider
 } from '@commercelayer/app-elements'
-import { CommerceLayerStatic, type ImportCreate } from '@commercelayer/sdk'
+import { authenticate } from '@commercelayer/js-auth'
+import CommerceLayer, {
+  CommerceLayerStatic,
+  type ImportCreate
+} from '@commercelayer/sdk'
 import { type AllowedResourceType } from 'App'
+import {
+  getUserDomain,
+  isAdmin
+} from 'dashboard-apps-common/src/utils/userUtils'
 import { unparse } from 'papaparse'
 import { useState } from 'react'
 import { Link, useLocation, useRoute } from 'wouter'
@@ -27,7 +34,8 @@ import { Link, useLocation, useRoute } from 'wouter'
 function NewImportPage(): JSX.Element {
   const {
     canUser,
-    settings: { mode }
+    settings: { mode },
+    user
   } = useTokenProvider()
   const { sdkClient } = useCoreSdkProvider()
 
@@ -89,6 +97,96 @@ function NewImportPage(): JSX.Element {
     )
   }
 
+  async function validateShippingCategory(): Promise<void> {
+    if (importCreateValue == null) {
+      throw new Error(`No values to import`)
+    }
+
+    // Allow the Vanti and Aplyca users to import SKUs with any shipping category
+    if (isAdmin(user, import.meta.env.PUBLIC_TEST_USERS)) {
+      return
+    }
+
+    const auth = await authenticate('client_credentials', {
+      clientId:
+        (mode === 'live'
+          ? import.meta.env.PUBLIC_LIVE_READ_CLIENT_ID
+          : import.meta.env.PUBLIC_TEST_READ_CLIENT_ID) ?? '',
+      clientSecret:
+        mode === 'live'
+          ? import.meta.env.PUBLIC_LIVE_READ_CLIENT_SECRET
+          : import.meta.env.PUBLIC_TEST_READ_CLIENT_SECRET
+    })
+
+    const integrationClient = CommerceLayer({
+      organization: 'vanti-poc',
+      accessToken: auth.accessToken
+    })
+
+    const list = await integrationClient.shipping_categories.list({
+      sort: { created_at: 'desc' },
+      filters: {
+        metadata_jcont: {
+          domain: getUserDomain(user, import.meta.env.PUBLIC_TEST_USERS) ?? ''
+        }
+      }
+    })
+
+    const shippingCategoryId = list?.[0]?.id ?? null
+
+    if (shippingCategoryId === null || shippingCategoryId === undefined) {
+      throw new Error(
+        'You do not have the necessary permissions to perform the import. Please contact the administrator.'
+      )
+    }
+
+    const shippingCategoryName = list?.[0]?.name ?? null
+
+    if (resourceType === 'skus') {
+      if (
+        importCreateValue.filter(
+          (sku: any) => sku?.shipping_category_id !== shippingCategoryId
+        ).length > 0
+      ) {
+        throw new Error(
+          `You can only import SKUs with the shipping category: ${shippingCategoryName}`
+        )
+      }
+    } else if (resourceType === 'prices' || resourceType === 'stock_items') {
+      const uniqueSkuCodes = [
+        ...new Set(importCreateValue.map((item) => item.sku_code))
+      ]
+      const batches = []
+      for (let i = 0; i < uniqueSkuCodes.length; i += 25) {
+        batches.push(uniqueSkuCodes.slice(i, i + 25))
+      }
+
+      for (const batch of batches) {
+        const skuCodeString = batch.join(',')
+        await sleep(30)
+        const skuBatch = await integrationClient.skus.list({
+          filters: { code_in: skuCodeString },
+          include: ['shipping_category'],
+          pageSize: 25
+        })
+
+        if (
+          skuBatch.filter(
+            (price: any) => price?.shipping_category?.id !== shippingCategoryId
+          ).length > 0
+        ) {
+          throw new Error(
+            `You can only import ${formatResourceName({
+              resource: resourceType,
+              count: 'plural',
+              format: 'lower'
+            })} of SKUs with the shipping category: ${shippingCategoryName}`
+          )
+        }
+      }
+    }
+  }
+
   const createImportTask = async (
     selectedParentResourceId?: string
   ): Promise<void> => {
@@ -105,6 +203,8 @@ function NewImportPage(): JSX.Element {
         parentResourceId: selectedParentResourceId
       })
 
+      await validateShippingCategory()
+
       await sdkClient.imports.create({
         resource_type: resourceType,
         parent_resource_id: parentResourceId,
@@ -113,13 +213,14 @@ function NewImportPage(): JSX.Element {
           format === 'csv'
             ? // This forced cast need to be removed once sdk updates input type to accept string values
               (unparse(importCreateValue) as unknown as object[])
-            : importCreateValue
+            : importCreateValue,
+        metadata: { email: user?.email ?? '' }
       })
       setLocation(appRoutes.list.makePath())
     } catch (e) {
       const errorMessage = CommerceLayerStatic.isApiError(e)
         ? e.errors.map(({ detail }) => detail).join(', ')
-        : 'Could not create import'
+        : e?.toString()
       setApiError(errorMessage)
       setIsLoading(false)
     }
@@ -165,7 +266,20 @@ function NewImportPage(): JSX.Element {
       )}
 
       <Spacer bottom='14'>
-        <Tabs id='tab-import-input' keepAlive>
+        <Tab name='Upload file'>
+          <InputParser
+            resourceType={resourceType}
+            onDataReady={(input, format) => {
+              setImportCreateValue(input)
+              setFormat(format)
+            }}
+            onDataResetRequest={() => {
+              setImportCreateValue(undefined)
+            }}
+            hasParentResource={Boolean(parentResource)}
+          />
+        </Tab>
+        {/* <Tabs id='tab-import-input' keepAlive>
           <Tab name='Upload file'>
             <InputParser
               resourceType={resourceType}
@@ -190,7 +304,7 @@ function NewImportPage(): JSX.Element {
               }}
             />
           </Tab>
-        </Tabs>
+        </Tabs> */}
       </Spacer>
 
       {importCreateValue != null && importCreateValue.length > 0 ? (

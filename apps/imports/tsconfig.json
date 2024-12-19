@@ -52,7 +52,7 @@
     "src",
     ".eslintrc.cjs",
     "@typing/**/*.d.ts",
-    "public/config*.js"
+    "public/config*.js",
   ],
   "references": [
     {
