@@ -39,7 +39,7 @@ export const exportRelationships: Record<ResourceWithRelationship, string[]> = {
   shipping_categories: ['skus'],
   shipping_methods: ['shipments'],
   skus: [
-    /* 'shipping_category', */
+    'shipping_category',
     'prices'
     /* 'prices.price_tiers',
     'stock_items',

@@ -69,6 +69,13 @@ const NewExportPage = (): JSX.Element | null => {
     setApiError(undefined)
     setIsLoading(true)
 
+    if (
+      ['prices', 'stock_items'].includes(resourceType) &&
+      values.includes.includes('sku')
+    ) {
+      values.includes.push('sku.shipping_category')
+    }
+
     try {
       const filters = adaptFormFiltersToSdk(values.filters, user?.timezone)
       await validateRecordsCount({
