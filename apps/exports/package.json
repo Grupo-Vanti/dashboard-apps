@@ -2,7 +2,7 @@
   "private": true,
   "name": "app-exports",
   "description": "A Commerce Layer Single Page Application to export resources with a nice GUI.",
-  "version": "2.10.4",
+  "version": "2.10.6",
   "type": "module",
   "license": "MIT",
   "keywords": [
@@ -25,7 +25,7 @@
     "test:watch": "vitest --passWithNoTests"
   },
   "dependencies": {
-    "@commercelayer/app-elements": "3.5.2",
+    "@commercelayer/app-elements": "3.5.5",
     "@commercelayer/eslint-config-ts-react": "^1.4.5",
     "@commercelayer/sdk": "6.26.0",
     "dashboard-apps-common": "workspace:*",
