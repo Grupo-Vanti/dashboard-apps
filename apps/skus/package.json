@@ -1,7 +1,7 @@
 {
   "private": true,
   "name": "app-skus",
-  "version": "2.10.6",
+  "version": "2.11.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -14,7 +14,7 @@
     "test:watch": "vitest --passWithNoTests"
   },
   "dependencies": {
-    "@commercelayer/app-elements": "3.5.5",
+    "@commercelayer/app-elements": "4.0.0",
     "@commercelayer/sdk": "6.26.0",
     "@hookform/resolvers": "^3.9.1",
     "dashboard-apps-common": "workspace:*",
